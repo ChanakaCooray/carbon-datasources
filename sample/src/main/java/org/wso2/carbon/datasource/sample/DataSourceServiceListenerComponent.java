@@ -15,7 +15,6 @@
  */
 package org.wso2.carbon.datasource.sample;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -29,54 +28,135 @@ import org.wso2.carbon.datasource.core.api.DataSourceManagementService;
 import org.wso2.carbon.datasource.core.api.DataSourceService;
 import org.wso2.carbon.datasource.core.beans.DataSourceMetadata;
 import org.wso2.carbon.datasource.core.exception.DataSourceException;
+import org.wso2.carbon.datasource.ldap.LDAPConnectionContext;
 
-import java.sql.Connection;
-import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import javax.naming.Context;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
+import javax.naming.PartialResultException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+
 
 /**
  * Example class.
  */
 @Component(
         name = "org.wso2.carbon.kernel.datasource.sample",
-        immediate = true
-)
+        immediate = true)
 public class DataSourceServiceListenerComponent {
 
     private static final Logger logger = LoggerFactory.getLogger(DataSourceServiceListenerComponent.class);
 
-    @Activate
-    protected void start(BundleContext bundleContext) {
-    }
+    public static String[] doListUsers(LDAPConnectionContext connectionSource) {
+        String[] userNames = new String[0];
+        int givenMax = 100;
+        int searchTime = 10000;
 
-    @Reference(
-            name = "org.wso2.carbon.datasource.DataSourceService",
-            service = DataSourceService.class,
-            cardinality = ReferenceCardinality.AT_LEAST_ONE,
-            policy = ReferencePolicy.DYNAMIC,
-            unbind = "unregisterDataSourceService"
-    )
-    protected void onDataSourceServiceReady(DataSourceService service) {
-        Connection connection = null;
+        SearchControls searchCtls = new SearchControls();
+        searchCtls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        searchCtls.setCountLimit(givenMax);
+        searchCtls.setTimeLimit(searchTime);
+
+        //        String searchBases = "ou=Groups,dc=wso2,dc=org";
+
+        String searchBases2 = "ou=Users,dc=wso2,dc=org";
+
+        String userNameProperty = "uid";
+
+        String serviceNameAttribute = "sn";
+
+        //        StringBuffer finalFilter = new StringBuffer("(&(objectClass=groupOfNames)(cn=*))");
+
+        StringBuffer finalFilter2 = new StringBuffer("(&(objectClass=person)(uid=*))");
+
+        String returnedAtts[] = new String[] { userNameProperty, serviceNameAttribute };
+
+        searchCtls.setReturningAttributes(returnedAtts);
+        DirContext dirContext = null;
+        NamingEnumeration<SearchResult> answer = null;
+        List<String> list = new ArrayList<String>();
+
         try {
-            HikariDataSource dsObject = (HikariDataSource) service.getDataSource("WSO2_CARBON_DB");
-            connection = dsObject.getConnection();
-            logger.info("Database Major Version {}", connection.getMetaData().getDatabaseMajorVersion());
-            //From connection do the required CRUD operation
-        } catch (DataSourceException e) {
-            logger.error("error occurred while fetching the data source.", e);
-        } catch (SQLException e) {
-            logger.error("error occurred while fetching the connection.", e);
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    logger.error("error occurred while closing the connection.", e);
+            dirContext = connectionSource.getContext();
+            String[] searchBaseArray = searchBases2.split("#");
+
+            for (String searchBase : searchBaseArray) {
+
+                answer = dirContext.search((searchBase), finalFilter2.toString(), searchCtls);
+
+                while (answer.hasMoreElements()) {
+                    SearchResult sr = answer.next();
+                    if (sr.getAttributes() != null) {
+                        Attribute attr = sr.getAttributes().get(userNameProperty);
+                        Attribute attrSurname = sr.getAttributes().get(serviceNameAttribute);
+
+                        if (attrSurname != null) {
+                            String serviceName = (String) attrSurname.get();
+                            if (serviceName != null && serviceName.equals("Service")) {
+                                continue;
+                            }
+                        }
+
+                        if (attr != null) {
+                            String name = (String) attr.get();
+                            list.add(name);
+                        }
+                    }
                 }
             }
+            userNames = list.toArray(new String[list.size()]);
+            Arrays.sort(userNames);
+
+            for (String username : userNames) {
+                logger.debug("result: " + username);
+            }
+        } catch (PartialResultException e) {
+            String errorMessage = "Error occurred while getting user list";
+            logger.debug(errorMessage);
+        } catch (NamingException e) {
+            String errorMessage = "Error occurred while getting user list for filter";
+            logger.debug(errorMessage);
         }
+        return userNames;
+    }
+
+    //    @Reference(
+    //            name = "org.wso2.carbon.datasource.DataSourceService",
+    //            service = DataSourceService.class,
+    //            cardinality = ReferenceCardinality.AT_LEAST_ONE,
+    //            policy = ReferencePolicy.DYNAMIC,
+    //            unbind = "unregisterDataSourceService"
+    //    )
+    //    protected void onDataSourceServiceReady(DataSourceService service) {
+    //        Connection connection = null;
+    //        try {
+    //            LDAPConnectionContext dsObject = (LDAPConnectionContext) service.getDataSource("WSO2_CARBON_DB");
+    //            logger.info("Database Major Version {}", connection.getMetaData().getDatabaseMajorVersion());
+    //            doListUsers(dsObject);
+    //            //From connection do the required CRUD operation
+    //        } catch (DataSourceException e) {
+    //            logger.error("error occurred while fetching the data source.", e);
+    //        } catch (SQLException e) {
+    //            logger.error("error occurred while fetching the connection.", e);
+    //        } finally {
+    //            if (connection != null) {
+    //                try {
+    //                    connection.close();
+    //                } catch (SQLException e) {
+    //                    logger.error("error occurred while closing the connection.", e);
+    //                }
+    //            }
+    //        }
+    //    }
+
+    @Activate protected void start(BundleContext bundleContext) {
     }
 
     @Reference(
@@ -84,9 +164,9 @@ public class DataSourceServiceListenerComponent {
             service = DataSourceManagementService.class,
             cardinality = ReferenceCardinality.AT_LEAST_ONE,
             policy = ReferencePolicy.DYNAMIC,
-            unbind = "unregisterDataSourceManagementService"
-    )
-    protected void onDataSourceManagementServiceReady(DataSourceManagementService service) {
+            unbind = "unregisterDataSourceManagementService")
+    protected void onDataSourceManagementServiceReady(
+            DataSourceManagementService service) {
         logger.info("Sample bundle register method fired");
         try {
             DataSourceMetadata metadata = service.getDataSource("WSO2_CARBON_DB");
@@ -97,21 +177,20 @@ public class DataSourceServiceListenerComponent {
         }
     }
 
-
     @Reference(
             name = "org.wso2.carbon.datasource.jndi",
             service = JNDIContextManager.class,
             cardinality = ReferenceCardinality.AT_LEAST_ONE,
             policy = ReferencePolicy.DYNAMIC,
-            unbind = "onJNDIUnregister"
-    )
+            unbind = "onJNDIUnregister")
     protected void onJNDIReady(JNDIContextManager service) {
-
         try {
             Context ctx = service.newInitialContext();
-            Object obj = ctx.lookup("java:comp/env/jdbc/WSO2CarbonDB/test");
+            Object obj = ctx.lookup("java:comp/env/ldap/WSO2CarbonDB/test");
             logger.info("Fetched data source: " + obj.toString());
-            //Cast the object to required DataSource type and perform crud operation.
+
+            //Cast the object to required DataSource type and perform operation.
+            doListUsers((LDAPConnectionContext) obj);
         } catch (NamingException e) {
             logger.info("Error occurred while jndi lookup", e);
         }

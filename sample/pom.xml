@@ -47,12 +47,13 @@
         <dependency>
             <groupId>org.wso2.carbon.jndi</groupId>
             <artifactId>org.wso2.carbon.jndi</artifactId>
-            <version>1.0.0-m1</version>
+            <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
     <properties>
         <export.package>org.wso2.carbon.datasource.sample.*</export.package>
-        <import.package>javax.xml.parsers;version=0.0.0,*;resolution:=optional,org.wso2.carbon.datasource.core.*</import.package>
+        <import.package>javax.xml.parsers;version=0.0.0,*;resolution:=optional,org.wso2.carbon.datasource.core
+            .*,org.wso2.carbon.datasource.ldap.*</import.package>
         <dynamic.import.package>*</dynamic.import.package>
     </properties>
 

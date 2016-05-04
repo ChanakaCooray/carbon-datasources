@@ -21,8 +21,10 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.service.component.annotations.ReferenceCardinality;
 import org.osgi.service.component.annotations.ReferencePolicy;
+import org.osgi.service.jndi.JNDIContextManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.wso2.carbon.datasource.core.DataHolder;
 import org.wso2.carbon.datasource.core.DataSourceManager;
 import org.wso2.carbon.datasource.core.api.DataSourceManagementService;
 import org.wso2.carbon.datasource.core.api.DataSourceService;
@@ -33,9 +35,6 @@ import org.wso2.carbon.datasource.core.spi.DataSourceReader;
 import org.wso2.carbon.datasource.utils.DataSourceUtils;
 import org.wso2.carbon.kernel.startupresolver.RequiredCapabilityListener;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * DataSourceListenerComponent implements RequiredCapabilityListener interface. This wait till all the DataSourceReader
  * components are registered and then initialize the DataSourceManager. Followed by register the DataSourceService and
@@ -45,22 +44,18 @@ import java.util.Map;
         name = "org.wso2.carbon.kernel.datasource.core.internal.DataSourceListenerComponent",
         immediate = true,
         service = RequiredCapabilityListener.class,
-        property = {
-                "capability-name=org.wso2.carbon.datasource.core.spi.DataSourceReader",
-                "component-key=carbon-datasource-service"
-        }
-)
-public class DataSourceListenerComponent implements RequiredCapabilityListener {
+        property = { "capability-name=org.wso2.carbon.datasource.core.spi.DataSourceReader",
+                "component-key=carbon-datasource-service" }) public class DataSourceListenerComponent
+        implements RequiredCapabilityListener {
 
     private static final Logger logger = LoggerFactory.getLogger(DataSourceListenerComponent.class);
 
     private BundleContext bundleContext;
-    private Map<String, DataSourceReader> readers;
 
     @Activate
     protected void start(BundleContext bundleContext) {
         this.bundleContext = bundleContext;
-        this.readers = new HashMap<>();
+        DataHolder.getDataHolderInstance().setBundleContext(bundleContext);
     }
 
     @Reference(
@@ -71,11 +66,27 @@ public class DataSourceListenerComponent implements RequiredCapabilityListener {
             unbind = "unregisterReader"
     )
     protected void registerReader(DataSourceReader reader) {
-        readers.put(reader.getType(), reader);
+        DataHolder.getDataHolderInstance().addReader(reader);
     }
 
     protected void unregisterReader(DataSourceReader reader) {
-        readers.remove(reader.getType());
+        DataHolder.getDataHolderInstance().removeReader(reader);
+    }
+
+    @Reference(
+            name = "org.wso2.carbon.datasource.jndi",
+            service = JNDIContextManager.class,
+            cardinality = ReferenceCardinality.AT_LEAST_ONE,
+            policy = ReferencePolicy.DYNAMIC,
+            unbind = "unregisterJNDIContextManager"
+    )
+    protected void registerJNDIContextManager(
+            JNDIContextManager jndiContextManager) {
+        DataHolder.getDataHolderInstance().setJndiContextManager(jndiContextManager);
+    }
+
+    protected void unregisterJNDIContextManager(JNDIContextManager jndiContextManager) {
+        DataHolder.getDataHolderInstance().setJndiContextManager(null);
     }
 
     @Override
@@ -83,7 +94,7 @@ public class DataSourceListenerComponent implements RequiredCapabilityListener {
         try {
             String dataSourcesPath = DataSourceUtils.getDataSourceConfigPath().toString();
             DataSourceManager dataSourceManager = DataSourceManager.getInstance();
-            dataSourceManager.initDataSources(dataSourcesPath, readers);
+            dataSourceManager.initDataSources(dataSourcesPath, DataHolder.getDataHolderInstance().getReaders());
 
             DataSourceService dsService = new DataSourceServiceImpl();
             bundleContext.registerService(DataSourceService.class, dsService, null);

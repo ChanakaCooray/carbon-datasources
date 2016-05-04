@@ -24,6 +24,7 @@ import org.wso2.carbon.datasource.core.spi.DataSourceReader;
 import org.wso2.carbon.datasource.rdbms.RDBMSDataSourceConstants;
 import org.wso2.carbon.datasource.rdbms.hikari.utils.HikariDataSourceUtils;
 
+
 /**
  * HikariDataSourceReader is responsible for reading the hikari configuration from the configuration file and build
  * HikariDataSource.
@@ -37,7 +38,6 @@ public class HikariDataSourceReader implements DataSourceReader {
 
     @Activate
     protected void activate(BundleContext bundleContext) {
-
     }
 
     @Deactivate
