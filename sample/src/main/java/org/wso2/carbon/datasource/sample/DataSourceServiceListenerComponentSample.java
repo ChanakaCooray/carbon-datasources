@@ -15,7 +15,6 @@
  */
 package org.wso2.carbon.datasource.sample;
 
-import com.zaxxer.hikari.HikariDataSource;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
@@ -29,26 +28,29 @@ import org.wso2.carbon.datasource.core.api.DataSourceManagementService;
 import org.wso2.carbon.datasource.core.api.DataSourceService;
 import org.wso2.carbon.datasource.core.beans.DataSourceMetadata;
 import org.wso2.carbon.datasource.core.exception.DataSourceException;
+import org.wso2.carbon.datasource.ldap.beans.LDAPDataSource;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import javax.naming.Context;
 import javax.naming.NamingException;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 /**
  * Example class.
  */
-//@Component(
-//        name = "org.wso2.carbon.kernel.datasource.sample",
-//        immediate = true
-//)
-public class DataSourceServiceListenerComponent {
+@Component(
+        name = "org.wso2.carbon.kernel.datasource.sample",
+        immediate = true
+)
+public class DataSourceServiceListenerComponentSample {
 
-    private static final Logger logger = LoggerFactory.getLogger(DataSourceServiceListenerComponent.class);
+    private static final Logger logger = LoggerFactory.getLogger(DataSourceServiceListenerComponentSample.class);
+    private JNDIContextManager jndiContextManager;
 
     @Activate
     protected void start(BundleContext bundleContext) {
     }
+
 
     @Reference(
             name = "org.wso2.carbon.datasource.DataSourceService",
@@ -58,45 +60,14 @@ public class DataSourceServiceListenerComponent {
             unbind = "unregisterDataSourceService"
     )
     protected void onDataSourceServiceReady(DataSourceService service) {
-        Connection connection = null;
+        LDAPDataSource dsObject;
         try {
-            HikariDataSource dsObject = (HikariDataSource) service.getDataSource("WSO2_CARBON_DB");
-            connection = dsObject.getConnection();
-            logger.info("Database Major Version {}", connection.getMetaData().getDatabaseMajorVersion());
-            //From connection do the required CRUD operation
+            dsObject = (LDAPDataSource) service.getDataSource("WSO2_CARBON_DB");
+            logger.info("Fetched data source: " + dsObject.toString());
         } catch (DataSourceException e) {
-            logger.error("error occurred while fetching the data source.", e);
-        } catch (SQLException e) {
-            logger.error("error occurred while fetching the connection.", e);
-        } finally {
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (SQLException e) {
-                    logger.error("error occurred while closing the connection.", e);
-                }
-            }
+            e.printStackTrace();
         }
     }
-
-    @Reference(
-            name = "org.wso2.carbon.datasource.DataSourceManagementService",
-            service = DataSourceManagementService.class,
-            cardinality = ReferenceCardinality.AT_LEAST_ONE,
-            policy = ReferencePolicy.DYNAMIC,
-            unbind = "unregisterDataSourceManagementService"
-    )
-    protected void onDataSourceManagementServiceReady(DataSourceManagementService service) {
-        logger.info("Sample bundle register method fired");
-        try {
-            DataSourceMetadata metadata = service.getDataSource("WSO2_CARBON_DB");
-            logger.info(metadata.getName());
-            //You can perform your functionalities by using the injected service.
-        } catch (DataSourceException e) {
-            logger.error("Error occurred while fetching the data sources", e);
-        }
-    }
-
 
     @Reference(
             name = "org.wso2.carbon.datasource.jndi",
@@ -109,14 +80,26 @@ public class DataSourceServiceListenerComponent {
 
         try {
             Context ctx = service.newInitialContext();
-            Object obj = ctx.lookup("java:comp/env/jdbc/WSO2CarbonDB/test");
+            Object obj = ctx.lookup("java:comp/env/ldap/WSO2CarbonDB/test");
             logger.info("Fetched data source: " + obj.toString());
-            //Cast the object to required DataSource type and perform crud operation.
+            listProperties((LDAPDataSource) obj);
         } catch (NamingException e) {
             logger.info("Error occurred while jndi lookup", e);
         }
     }
 
+    public void listProperties(LDAPDataSource source){
+
+        logger.info("url of Dns: "+source.getUrlOfDns());
+        logger.info("dns Domain Name: "+source.getDnsDomainName());
+
+        logger.info("Environment Properties: ");
+        source.getEnvironment().forEach((key, value) -> logger.info(key+": "+value));
+
+        logger.info("Pooling Properties: ");
+        source.getPoolingProperties().forEach((key, value) -> logger.info(key+": "+value));
+
+    }
 
     protected void onJNDIUnregister(JNDIContextManager jndiContextManager) {
         logger.info("Unregistering data sources sample");
@@ -125,9 +108,4 @@ public class DataSourceServiceListenerComponent {
     protected void unregisterDataSourceService(DataSourceService dataSourceService) {
         logger.info("Unregistering data sources sample");
     }
-
-    protected void unregisterDataSourceManagementService(DataSourceManagementService dataSourceManagementService) {
-        logger.info("Unregistering data sources sample");
-    }
-
 }

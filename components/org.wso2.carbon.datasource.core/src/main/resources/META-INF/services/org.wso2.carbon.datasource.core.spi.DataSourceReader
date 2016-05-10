@@ -1,1 +1,2 @@
 org.wso2.carbon.datasource.rdbms.hikari.HikariDataSourceReader
+org.wso2.carbon.datasource.ldap.LDAPDataSourceReader

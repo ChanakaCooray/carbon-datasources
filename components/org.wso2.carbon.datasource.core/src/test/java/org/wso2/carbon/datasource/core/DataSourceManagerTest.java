@@ -50,7 +50,7 @@ public class DataSourceManagerTest extends BaseTest {
     @Test
     public void getDataSourceTypesTest() {
         List<String> types = dataSourceManager.getDataSourceTypes();
-        Assert.assertEquals(types.size(), 1, "Expected only one data source type.");
+        Assert.assertEquals(types.size(), 2, "Expected only one data source type.");
     }
 
     @AfterSuite
