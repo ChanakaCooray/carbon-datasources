@@ -26,6 +26,7 @@
     <artifactId>carbon-datasource-tests</artifactId>
     <name>WSO2 Carbon Datasources - Tests Parent</name>
     <modules>
+        <module>datasource-test-distribution</module>
         <module>osgi-tests</module>
     </modules>
 </project>
